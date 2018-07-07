@@ -1,25 +1,248 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "PA1_template"
+author: "Rajeshwaran Gunalan"
+date: "7 July 2018"
+output: html_document
 ---
 
+#### Loading the necessary libraries 
 
-## Loading and preprocessing the data
+``` {r , echo=TRUE , message=FALSE}
+library(caret)
+library(ggplot2)
+library(plyr)
+library(dplyr)
+library(stringr)
+```
 
-
-
-## What is mean total number of steps taken per day?
-
-
-
-## What is the average daily activity pattern?
-
-
-
-## Imputing missing values
+<br>
+<br>
 
 
+### Loading and preprocessing the data
 
-## Are there differences in activity patterns between weekdays and weekends?
+
+#### Loading the data to memory and doing the necessary format changes  
+
+```{r , echo=TRUE , message=FALSE}
+
+Activity <- read.csv("C:/Data Science/John Hopkins - Coursera/Reproducible Research/Assignment 1/activity.csv")
+Activity$date <- as.character(Activity$date)
+Activity$date <- as.factor(Activity$date)
+
+```
+
+
+<br>
+<br>
+
+
+#### What is mean total number of steps taken per day?
+
+
+```{r  , echo=TRUE}
+TotalStepsPerDay <- Activity %>% group_by(date) %>% summarise(TotalSteps = sum(steps))
+head(TotalStepsPerDay , 10)
+
+```
+
+<br>
+<br>
+
+
+#### Histogram of steps taken per day 
+
+
+```{r  , echo=TRUE}
+
+hist(TotalStepsPerDay$TotalSteps)
+
+```
+
+
+#### Mean and Median of total steps per day
+
+
+```{r  , echo=TRUE}
+
+meanTotalSteps <- mean(TotalStepsPerDay$TotalSteps , na.rm = TRUE)
+meanTotalSteps
+
+medianTotalSteps <- median(TotalStepsPerDay$TotalSteps , na.rm = TRUE)
+medianTotalSteps
+```
+
+<br>
+<br>
+
+
+### What is the average daily activity pattern?
+
+
+#### Time series plot
+
+```{r  , echo=TRUE}
+
+Activity$interval <- as.factor(Activity$interval)
+
+IntervalStepsMean <- Activity %>% group_by(interval) %>% summarise(MeanSteps=mean(steps , na.rm = TRUE))
+
+plot(as.numeric( IntervalStepsMean$interval)  , IntervalStepsMean$MeanSteps , type="l")
+
+```
+
+<br>
+<br>
+
+#### Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+
+``` {r , echo=TRUE}
+
+MostActiveInterval <- IntervalStepsMean[order(IntervalStepsMean$MeanSteps , decreasing = TRUE),]$interval [1]
+
+as.numeric(as.character(MostActiveInterval))
+
+```
+
+<br>
+<br>
+
+### Imputing Missing Values 
+
+<br>
+
+#### Calculate and report the total number of missing values in the dataset 
+
+``` {r , echo=TRUE}
+
+nrow(Activity[ which(is.na(Activity$steps)) , ])
+
+
+``` 
+
+<br>
+<br>
+
+#### Filling in the missing values and creating a new dataset that is equal to the original dataset but with the missing data filled in.
+
+```{r , echo=TRUE}
+
+
+MissingValueIndices <- which(is.na(Activity$steps))
+
+
+Activity_MissingImputed <- Activity
+
+
+for( i in MissingValueIndices)
+{
+  
+  Activity_MissingImputed[i , "steps"] <- inner_join(Activity[i, ] , IntervalStepsMean , by = 'interval')$MeanSteps
+  
+  
+}
+
+
+```
+
+
+<br>
+<br>
+
+### Histogram of total number of steps each day after imputation 
+
+
+```{r , echo=TRUE}
+
+TotalStepsPerDay_Imputed <- Activity_MissingImputed %>% group_by(date) %>% summarise(TotalSteps = sum(steps))
+
+hist(TotalStepsPerDay_Imputed$TotalSteps)
+
+meanTotalSteps_Imputed <- mean(TotalStepsPerDay_Imputed$TotalSteps , na.rm = TRUE)
+
+medianTotalSteps_Imputed <- median(TotalStepsPerDay_Imputed$TotalSteps , na.rm = TRUE)
+
+
+```
+
+
+
+#### Mean and Median of total steps each day after imputation 
+
+
+``` {r , echo=TRUE}
+
+meanTotalSteps_Imputed
+
+medianTotalSteps_Imputed
+
+```
+
+
+#### Impact of Mean and Median after imputation 
+
+
+```{r}
+
+meanTotalSteps - meanTotalSteps_Imputed
+
+medianTotalSteps - medianTotalSteps_Imputed
+
+```
+
+#### Since I had used the interval wise mean for imputing , there is no impact on the mean. Howeever, there is a small difference in the median 
+
+<br>
+<br>
+
+
+
+
+### Are there differences in activity patterns between weekdays and weekends?
+
+
+#### Creating a new feature indicating Weekday or Weekend 
+
+
+```{r , echo=TRUE}
+
+Activity_MissingImputed$date <- as.character(Activity_MissingImputed$date)
+
+Activity_MissingImputed$date <- as.Date(Activity_MissingImputed$date)
+
+Activity_MissingImputed$DayOfWeek <- weekdays(Activity_MissingImputed$date )
+
+
+Activity_MissingImputed$WeekendFlag <- NA
+
+Activity_MissingImputed$WeekendFlag <- as.character(Activity_MissingImputed$WeekendFlag)
+
+Activity_MissingImputed[which(Activity_MissingImputed$DayOfWeek == "Saturday") , ]$WeekendFlag <- "weekend"
+
+Activity_MissingImputed[which(Activity_MissingImputed$DayOfWeek == "Sunday") , ]$WeekendFlag <- "weekend"
+
+Activity_MissingImputed[which(is.na(Activity_MissingImputed$WeekendFlag)) , ]$WeekendFlag <- "weekday"
+
+Activity_MissingImputed$WeekendFlag <- as.factor(Activity_MissingImputed$WeekendFlag)
+
+
+```
+
+#### Plot to check if there is an difference in activity levels  between Weekday and weekend
+
+
+```{r , echo=TRUE}
+
+
+IntervalStepsMean_WeekDay <- Activity_MissingImputed %>% group_by(WeekendFlag , interval) %>% summarise(MeanSteps=mean(steps , na.rm = TRUE))
+
+
+ggplot(data=IntervalStepsMean_WeekDay , mapping = aes(as.numeric(interval) , MeanSteps)) + geom_line()+
+                                            facet_wrap( ~ WeekendFlag)
+
+
+```
+
+
+
+
